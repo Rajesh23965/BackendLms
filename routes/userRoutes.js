@@ -2,18 +2,24 @@ const express = require('express');
 const router = express.Router();
 const { 
   createUser, 
+  searchUsers,
   login,
   Logout,
   getUserById, 
   getAllUsers, 
   deleteUser, 
   updateUser,
-  CheckUser
+  CheckUser,
+  verifyAndRefreshToken
 } = require('../controllers/userController');
 const { isAdmin, isAuthenticated } = require('../middlewares/authMiddleware.js');
 
+router.get('/searchAll',isAuthenticated,isAdmin,  getAllUsers); 
+
 // Create user (Admin only)
 router.post('/create', isAuthenticated, isAdmin, createUser);
+//Search user (Admin only)
+router.get('/search', searchUsers);
 
 // Login (public)
 router.post('/login', login);
@@ -22,7 +28,7 @@ router.post('/login', login);
 router.post('/logout', Logout);
 
 // Check authenticated user
-router.get('/checkuser', isAuthenticated, CheckUser);
+router.get('/profile', verifyAndRefreshToken, CheckUser);
 
 // Get all users (Admin only)
 router.get('/all',  getAllUsers);

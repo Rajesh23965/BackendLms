@@ -87,18 +87,43 @@ const deleteBook = async (req, res) => {
 };
 
 // All users: Get all books
+// const getAllBooks = async (req, res) => {
+//   const userId = req.user ? req.user._id : null;
+//   try {
+//     if (!userId) {
+//       return res.status(401).json({ message: 'User is not authenticated' });
+//     }
+//     const books = await Book.find();
+//     res.status(200).json(books);
+//   } catch (error) {
+//     res.status(500).json({ message: 'Error retrieving books', error });
+//   }
+// };
 const getAllBooks = async (req, res) => {
   const userId = req.user ? req.user._id : null;
   try {
     if (!userId) {
       return res.status(401).json({ message: 'User is not authenticated' });
     }
-    const books = await Book.find();
+
+    const { isbn, title, author, edition, publisher, category, status } = req.query;
+
+ 
+    const filter = {};
+    if (isbn) filter.isbn = new RegExp(isbn, 'i'); 
+    if (title) filter.title = new RegExp(title, 'i');
+    if (author) filter.author = new RegExp(author, 'i');
+    if (edition) filter.edition = new RegExp(edition, 'i');
+    if (publisher) filter.publisher = new RegExp(publisher, 'i');
+    if (category) filter.category = new RegExp(category, 'i');
+    if (status) filter.status = status; 
+    const books = await Book.find(filter);
     res.status(200).json(books);
   } catch (error) {
     res.status(500).json({ message: 'Error retrieving books', error });
   }
 };
+
 
 // All users: Get book by ID
 const getBookById = async (req, res) => {
@@ -117,7 +142,42 @@ const getBookById = async (req, res) => {
   }
 };
 
+const searchBooks = async (req, res) => {
+  try {
+    const { query } = req.query;
+
+    if (!query) {
+      return res.status(400).json({ message: "Search query is required" });
+    }
+
+    // Create a case-insensitive regex for the search query
+    const regex = new RegExp(query, "i");
+
+    // Search across multiple fields
+    const results = await Book.find({
+      $or: [
+        { title: { $regex: regex } },
+        { author: { $regex: regex } },
+        { publisher: { $regex: regex } },
+        { isbn: { $regex: regex } },
+      ],
+    });
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "No users found matching the search query" });
+    }
+
+    res.status(200).json({ filterData: results });
+  } catch (error) {
+    res.status(500).json({ message: "Error performing search", error });
+  }
+};
+
+
+
+
 module.exports = {
+  searchBooks,
   createBook,
   updateBook,
   deleteBook,

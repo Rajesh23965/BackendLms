@@ -11,7 +11,7 @@ const libraryCardRoutes =require("./routes/librarycardRoutes")
 const fineRoutes = require('./routes/fineRoutes');
 const batchRoutes =require('./routes/batchRoutes.js');
 const departmentRoutes=require("./routes/departmentRoutes.js")
-
+const borrowRoutes=require("./routes/borrowRoutes.js")
 require('dotenv').config();
 
 const PORT=process.env.PORT || 8000
@@ -43,6 +43,8 @@ app.use("/api/card",libraryCardRoutes);
 app.use('/fines', fineRoutes);
 app.use("/api/batch",batchRoutes);
 app.use("/api/department",departmentRoutes);
+app.use("/api/borrow",borrowRoutes);
+
 app.listen(PORT,()=>{
   console.log(`Server is running on ${PORT}`);
 })

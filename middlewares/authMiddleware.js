@@ -11,17 +11,21 @@ const isAuthenticated = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded._id); // Fetch full user from the database
-
+    const user = await User.findById(decoded._id);
+  
     if (!user) {
       return res.status(401).json({ message: 'User not found' });
     }
-
-    req.user = user; // Attach the full user object to the request
+    
+    req.user = user;
     next();
   } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token expired. Please log in again.' });
+    }
     return res.status(401).json({ message: 'Invalid token', error: error.message });
   }
+  
 };
 
 // Middleware to verify if the user has admin role
