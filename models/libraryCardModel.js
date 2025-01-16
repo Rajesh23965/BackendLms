@@ -1,14 +1,41 @@
-const mongoose =require('mongoose');
-const Schema=mongoose.Schema;
+const mongoose = require('mongoose');
 
-const LibraryCardSchema = new Schema({
-    user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    cardNumber: { type: String, required: true },
-    issueDate: { type: Date, required: true },
-    expiryDate: { type: Date, required: true },
-    status: { type: String, required: true } // e.g., 'active', 'expired', 'suspended'
-  });
-  
-  const LibraryCard = mongoose.model('LibraryCard', LibraryCardSchema);
-  module.exports = LibraryCard;
-  
+const LibraryCardSchema = new mongoose.Schema(
+  {
+    user_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      unique: true, // Ensures one card per user
+    },
+    batch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Batch',
+      required: true,
+    },
+    department: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Department',
+      required: true,
+    },
+    cardNumber: {
+      type: String,
+      default: null,
+      unique: true, 
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'approved'],
+      default: 'pending',
+    },
+    issueDate: {
+      type: Date,
+    },
+    expiryDate: {
+      type: Date,
+    },
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model('LibraryCard', LibraryCardSchema);

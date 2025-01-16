@@ -1,45 +1,43 @@
 const express = require('express');
 const router = express.Router();
-const { 
-  createUser, 
+const {
+  createUser,
   searchUsers,
   login,
   Logout,
-  getUserById, 
-  getAllUsers, 
-  deleteUser, 
+  getUserById,
+  getAllUsers,
+  deleteUser,
   updateUser,
   CheckUser,
-  verifyAndRefreshToken
+  verifyAndRefreshToken,
+  forgetPassword,
+  resetPassword,
+  changePassword,
 } = require('../controllers/userController');
 const { isAdmin, isAuthenticated } = require('../middlewares/authMiddleware.js');
 
-router.get('/searchAll',isAuthenticated,isAdmin,  getAllUsers); 
-
-// Create user (Admin only)
-router.post('/create', isAuthenticated, isAdmin, createUser);
-//Search user (Admin only)
-router.get('/search', searchUsers);
-
-// Login (public)
+// Public Routes
 router.post('/login', login);
-
-// Logout (public)
 router.post('/logout', Logout);
+router.post('/forget-password', forgetPassword);
+router.post('/reset-password', resetPassword);
+router.post('/change-password', verifyAndRefreshToken, changePassword);
 
-// Check authenticated user
-router.get('/profile', verifyAndRefreshToken, CheckUser);
+// Authenticated User Routes
+router.use(verifyAndRefreshToken); 
 
-// Get all users (Admin only)
-router.get('/all',  getAllUsers);
+router.get('/profile', CheckUser);
 
-// Get user by ID (Admin and Student)
-router.get('/:userId', isAuthenticated, getUserById);
+router.get('/all', getAllUsers);
+// Admin Routes
+router.use(isAuthenticated, isAdmin); 
 
-// Update user by ID (Admin only, use PUT for updating resources)
-router.put('/:userId', isAuthenticated, isAdmin, updateUser);
-
-// Delete user (Admin only)
-router.delete('/:userId', isAuthenticated, isAdmin, deleteUser);
+router.get('/searchAll', getAllUsers);
+router.post('/create', createUser);
+router.get('/search', searchUsers);
+router.get('/:userId', getUserById);
+router.put('/:userId', updateUser);
+router.delete('/:userId', deleteUser);
 
 module.exports = router;

@@ -1,27 +1,44 @@
 const express = require('express');
+const {
+  requestLibraryCard,
+  approveLibraryCard,
+  getLibraryCard,
+  getPendingLibraryCards
+} = require('../controllers/librarycardController');
+const { isAuthenticated, isAdmin } = require('../middlewares/authMiddleware');
+
 const router = express.Router();
-const { 
-  issueLibraryCard, 
-  editLibraryCard, 
-  deleteLibraryCard, 
-  requestLibraryCard, 
-  getLibraryCard, 
-  isAdmin 
-} = require('../controllers/librarycardController.js');
 
-// Route for admin to issue a library card
-router.post('/issue', isAdmin, issueLibraryCard);
-
-// Route for admin to edit a library card
-router.put('/edit/:cardId', isAdmin, editLibraryCard);
-
-// Route for admin to delete a library card
-router.delete('/delete/:cardId', isAdmin, deleteLibraryCard);
-
-// Route for students to request a library card
-router.post('/request', requestLibraryCard);
-
-// Route to get a library card by user ID
-router.get('/:userId', getLibraryCard);
+// Routes
+router.post('/request', isAuthenticated, requestLibraryCard);
+router.put('/approve/:cardId', isAuthenticated, isAdmin, approveLibraryCard);
+router.get('/:userId?', isAuthenticated, getLibraryCard);
+router.get("/pending", isAuthenticated,getPendingLibraryCards);
 
 module.exports = router;
+
+
+
+// const express = require('express');
+// const {
+//   requestLibraryCard,
+//   issueLibraryCard,
+//   editLibraryCard,
+//   deleteLibraryCard,
+//   getLibraryCard,
+// } = require('../controllers/librarycardController.js');
+// const { isAuthenticated, isAdmin } = require('../middlewares/authMiddleware');
+
+// const router = express.Router();
+
+// // Routes
+// router.post('/request', isAuthenticated, requestLibraryCard);
+// router.put('/issue/:cardId', isAuthenticated, isAdmin, issueLibraryCard);
+// router.put('/edit/:cardId', isAuthenticated, isAdmin, editLibraryCard);
+// router.delete('/delete/:cardId', isAuthenticated, isAdmin, deleteLibraryCard);
+// router.get('/:userId', isAuthenticated, getLibraryCard);
+
+// module.exports = router;
+
+
+

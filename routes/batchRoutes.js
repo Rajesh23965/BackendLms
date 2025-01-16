@@ -11,7 +11,7 @@ const { isAuthenticated, isAdmin } = require('../middlewares/authMiddleware.js')
 
 // Route for admin to create a book
 router.post('/createbatch', isAuthenticated,isAdmin, createBatch);
-router.get('/getall', getBatch)
+router.get('/getall',isAuthenticated, getBatch)
 router.put('/update/:id',isAuthenticated,isAdmin, updateBatch)
 router.delete('/delete/:id',isAuthenticated,isAdmin,deleteBatch)
 

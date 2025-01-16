@@ -14,7 +14,7 @@ const {
 
 router.post("/createdepartment", isAuthenticated,isAdmin,  createDepartment);
 
-router.get("/all", getDepartment);
+router.get("/all",isAuthenticated, getDepartment);
 
 router.put("/updatedept/:dept",  isAuthenticated,isAdmin, updateDepartment);
 

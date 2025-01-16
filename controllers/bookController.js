@@ -1,4 +1,6 @@
+const { default: mongoose } = require('mongoose');
 const Book = require('../models/bookModel.js');
+
 // Improved createBook function (file uploads optional)
 const createBook = async (req, res) => {
   try {
@@ -142,42 +144,88 @@ const getBookById = async (req, res) => {
   }
 };
 
+
+const countBooks = async (req, res) => {
+  try {
+    const { isbn, title, author, edition, publisher, category, status } = req.query;
+
+  
+    const filter = {};
+    if (isbn) filter.isbn = new RegExp(isbn, 'i');
+    if (title) filter.title = new RegExp(title, 'i');
+    if (author) filter.author = new RegExp(author, 'i');
+    if (edition) filter.edition = new RegExp(edition, 'i');
+    if (publisher) filter.publisher = new RegExp(publisher, 'i');
+    if (category) filter.category = new RegExp(category, 'i');
+    if (status) filter.status = status;
+
+
+    const count = await Book.countDocuments(filter);
+
+    res.status(200).json({ totalBooks: count });
+  } catch (error) {
+    res.status(500).json({ message: 'Error counting books', error });
+  }
+};
+
 const searchBooks = async (req, res) => {
   try {
     const { query } = req.query;
 
-    if (!query) {
-      return res.status(400).json({ message: "Search query is required" });
+    if (!query || query.trim() === '') {
+      return res.status(400).json({ message: 'Search query is required' });
     }
 
-    // Create a case-insensitive regex for the search query
-    const regex = new RegExp(query, "i");
+    // Log the type of the query parameter
+    console.log('Search Query:', query);
 
-    // Search across multiple fields
-    const results = await Book.find({
-      $or: [
-        { title: { $regex: regex } },
-        { author: { $regex: regex } },
-        { publisher: { $regex: regex } },
-        { isbn: { $regex: regex } },
-      ],
+    // Initialize search conditions
+    const searchConditions = {
+      $or: [],
+    };
+
+    // Add regex searches only to string fields
+    const stringFields = ['title', 'author', 'publisher', 'description', 'edition'];
+
+    stringFields.forEach((field) => {
+      searchConditions.$or.push({
+        [field]: { $regex: query, $options: 'i' }, 
+      });
     });
 
-    if (results.length === 0) {
-      return res.status(404).json({ message: "No users found matching the search query" });
+    // Check if the query is a valid ObjectId for category
+    if (mongoose.Types.ObjectId.isValid(query)) {
+      searchConditions.$or.push({
+        category: mongoose.Types.ObjectId(query), // Search by category if it's a valid ObjectId
+      });
     }
 
-    res.status(200).json({ filterData: results });
+    // Special handling for ISBN (assume ISBN is stored as a string or number)
+    const isbnQuery = isNaN(query) ? null : query; // Check if query is numeric
+    if (isbnQuery) {
+      searchConditions.$or.push({ isbn: isbnQuery }); // Exact match for numeric ISBN
+    }
+
+    // console.log('Search Conditions:', searchConditions); // Log the search conditions before querying
+
+    // Execute the query
+    const books = await Book.find(searchConditions).populate('category', 'name'); // Populate category name if needed
+
+    if (books.length === 0) {
+      return res.status(404).json({ message: 'No books found matching the query' });
+    }
+
+    res.status(200).json({ books, message: 'Books found successfully' });
   } catch (error) {
-    res.status(500).json({ message: "Error performing search", error });
+    console.error('Error searching books:', error.message);
+    res.status(500).json({ message: 'Error searching books', error: error.message });
   }
 };
 
 
-
-
 module.exports = {
   searchBooks,
+  countBooks,
   createBook,
   updateBook,
   deleteBook,

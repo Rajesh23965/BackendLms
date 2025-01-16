@@ -3,7 +3,9 @@ const BatchModel=require('../models/batchModel.js')
 const DepartementModel=require('../models/departmentModel.js');;
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-
+const nodemailer = require('nodemailer');
+const mongoose = require('mongoose'); 
+const { messages } = require('nodemailer-mock/lib/messages');
 
 // Create a new user (Admin or Student)
 
@@ -89,10 +91,22 @@ const login = async (req, res) => {
     );
 
     // Set the token in a cookie
-    res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 3600000 });
-
-    // Send back user data and token
-    res.status(200).json({ success: true, message: 'Login successful', user, token });
+    // res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 3600000 });
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',  
+      maxAge: 3600000,
+    });
+    
+    
+  
+    res.status(200).json({
+      success: true,
+      message: "Login successful",
+      user: user,
+      token: token,
+    });
+    
 
   } catch (err) {
     console.error(err);
@@ -100,65 +114,106 @@ const login = async (req, res) => {
   }
 };
 
-// const login = async (req, res) => {
-//   const { email, password } = req.body;
 
-//   try {
-//     // Find the user by email
-//     const user = await User.findOne({ email });
-//     if (!user) {
-//       return res.status(400).json({ message: 'User not found' });
-//     }
 
-    
-//     const isMatch = await bcrypt.compare(password, user.password);
-//     if (!isMatch) {
-//       return res.status(400).json({ message: 'Invalid credentials' });
-//     }
+const verifyAndRefreshToken = (req, res, next) => {
+  const token = req.cookies.token || 
+                (req.headers.authorization && req.headers.authorization.startsWith('Bearer ') 
+                 ? req.headers.authorization.split(' ')[1] 
+                 : null);
 
-//     // Create a JWT token
-//     const token = jwt.sign(
-//       { _id: user._id, role: user.role },
-//       process.env.JWT_SECRET,
-//       { expiresIn: '1h' } 
-//     );
+  if (!token) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
 
-//     // Set the token in a cookie (cookie will expire after 1 hour)
-   
-//     res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 3600000 });
+  jwt.verify(token, process.env.JWT_SECRET, (error, decoded) => {
+    if (error) {
+      if (error.name === 'TokenExpiredError') {
+        return res.status(403).json({ message: 'Token expired. Please log in again.' });
+      }
+      return res.status(403).json({ message: 'Invalid token' });
+    }
 
-//     res.status(200).json({ success: true, message: 'Login successful',user,token });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: 'Server error' });
-//   }
-// };
+    const now = Math.floor(Date.now() / 1000);
+    if (decoded.exp - now < 300) { // Refresh token if close to expiry
+      const newToken = jwt.sign(
+        { _id: decoded._id, role: decoded.role }, 
+        process.env.JWT_SECRET, 
+        { expiresIn: '1h' }
+      );
 
-// Logout
+      res.cookie('token', newToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 3600000,
+      });
+    }
+
+    req.user = decoded;
+    next();
+  });
+};
+
+
+
+
 const Logout = (req, res) => {
   try {
-    res.clearCookie('token');
-  res.status(200).json({success: true, message: 'User Logout successfully' });
+    // Clear the token cookie
+    res.clearCookie('token', {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    });
+
+    // Send a success response
+    res.status(200).json({ success: true, message: 'User logged out successfully' });
   } catch (error) {
-    // If there's an error, return a 500 status code with a message
-    res.status(500).json({ success: false, message: "Internal server error" });
-    console.log(error); 
-}
-}
+    console.error('Logout error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+
 
 // Check the Authenticated User's information
 const CheckUser = (req, res) => {
-  try {
-    const user = req.user;
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    res.status(200).json(user);
-  } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
-    console.log(error);
+  // Access the decoded user data from req.user
+  const user = req.user;
+
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
   }
-  
+
+  // Return user information
+  res.status(200).json({
+    success: true,
+    message: "User profile retrieved successfully",
+    user,
+  });
+};
+
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.header("Authorization");
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.split(" ")[1]
+    : req.cookies.token;
+
+  console.log("Token received:", token); 
+
+  if (!token) {
+    return res.status(403).json({ message: "No token provided" });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) {
+      console.error("JWT Error:", err.message);
+      return res.status(403).json({ message: "Invalid or expired token ", error: err.message });
+    }
+    req.user = user; // Attach user to the request
+    next();
+  });
 };
 
 
@@ -180,19 +235,31 @@ const getUserById = async (req, res) => {
 
 const getAllUsers = async (req, res) => {
   try {
-    const studentData = await User.find()
-      .populate('batch')       
-      .populate('department');   
-    
+    const { role, _id } = req.user;
+    let studentData;
+
+    if (role === "admin") {
+      studentData = await User.find()
+        .populate('batch')
+        .populate('department');
+      return res.status(200).json({ studentData, message: "All users found successfully" });
+    }
+
+    if (role === "student") {
+      studentData = await User.findById(_id).populate('batch').populate('department');
       if (!studentData) {
-        return res.status(404).json({ message: "users not found" });
-      } else {
-        return res.status(200).json({ studentData, message: "users found successfully" });  
+        return res.status(404).json({ message: "User not found" });
       }
+      return res.status(200).json({ studentData, message: "User data found successfully" });
+    }
+
+    return res.status(403).json({ message: "Unauthorized access" });
   } catch (error) {
-    res.status(500).json({ message: 'Error retrieving users', error });
+    res.status(500).json({ message: "Error retrieving users", error });
   }
 };
+
+
 
 //update
 const updateUser = async (req, res) => {
@@ -257,69 +324,179 @@ const searchUsers = async (req, res) => {
     const { query } = req.query;
 
     if (!query) {
-      return res.status(400).json({ message: "Search query is required" });
+      return res.status(400).json({ message: 'Search query is required' });
     }
 
-    // Create a case-insensitive regex for the search query
-    const regex = new RegExp(query, "i");
-
-    // Search across multiple fields
-    const results = await User.find({
+    const searchConditions = {
       $or: [
-        { name: { $regex: regex } },
-        { email: { $regex: regex } },
-        { mobileNumber: { $regex: regex } },
-        { userId: { $regex: regex } },
+        { name: { $regex: query, $options: 'i' } },
+        { email: { $regex: query, $options: 'i' } },
+        { mobileNumber: { $regex: query, $options: 'i' } },
+        { userId: { $regex: query, $options: 'i' } },
+        ...(mongoose.Types.ObjectId.isValid(query)
+          ? [
+              { batch: query },
+              { department: query },
+            ]
+          : []),
       ],
-    });
+    };
 
-    if (results.length === 0) {
-      return res.status(404).json({ message: "No users found matching the search query" });
+    const users = await User.find(searchConditions)
+      .populate('batch', 'batchName')
+      .populate('department', 'departmentName');
+
+    if (users.length === 0) {
+      return res.status(404).json({ message: 'No users found matching the query' });
     }
 
-    res.status(200).json({ studentData: results });
+    res.status(200).json({ users, message: 'Users found successfully' });
   } catch (error) {
-    res.status(500).json({ message: "Error performing search", error });
+    console.error('Error searching users:', error);
+    res.status(500).json({ message: 'Error searching users', error: error.message });
   }
 };
 
+module.exports = { searchUsers };
 
 
+const changePassword = async (req, res) => {
+  const { password, newPassword, confirmNewPassword } = req.body;
 
-//Middleware to verify token expiry and refresh if valid
- 
-const verifyAndRefreshToken = (req, res, next) => {
-  const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
 
-  if (!token) {
-    return res.status(401).json({ message: 'You need to log in' });
+  const { _id } = req.user;
+
+  // Input validation
+  if (!password || !newPassword || !confirmNewPassword) {
+    return res.status(400).json({ message: 'All fields are required' });
+  }
+
+  if (newPassword !== confirmNewPassword) {
+    return res.status(400).json({ message: 'New password and confirm password do not match' });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-
-    // Refresh token if expiry is near
-    const now = Math.floor(Date.now() / 1000);
-    if (decoded.exp - now < 300) {
-      const newToken = jwt.sign(
-        { _id: decoded._id, role: decoded.role },
-        process.env.JWT_SECRET,
-        { expiresIn: '1h' }
-      );
-
-      res.cookie('token', newToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 3600000
-      });
+    // Fetch the user by ID
+    const user = await User.findById(_id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    next();
+    // Check if the old password matches
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Old password is incorrect' });
+    }
+
+    // Validate new password strength
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+    }
+
+    // Hash the new password and save
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.json({ message: 'Password has been changed successfully' });
   } catch (error) {
-    return res.status(401).json({ message: 'Invalid or expired token', error: error.message });
+    console.error('Error in changePassword:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
+
+
+//Forgot Password
+// Forget Password
+const forgetPassword = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    // Validate email input
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    // Check if the user exists
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+    const otpExpiry = Date.now() + 3600000; // OTP valid for 1 hour
+
+    // Update user with OTP and expiry
+    user.resetPasswordToken = otp;
+    user.resetPasswordExpires = otpExpiry;
+    await user.save();
+
+    // Send OTP email
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: "rajeshky123456@gmail.com", // Your email
+        pass: "vjfc yigc mpch jujq", // Your email password or app password
+      },
+    });
+
+    const mailOptions = {
+      from: "rajeshky123456@gmail.com",
+      to: email,
+      subject: "Password Reset OTP",
+      text: `Your OTP for password reset is: ${otp}. It will expire in 1 hour.`,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({ message: "OTP sent successfully to your email." });
+  } catch (error) {
+    console.error("Error in forgetPassword:", error);
+    res.status(500).json({ message: "An error occurred. Please try again later." });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  const { email, otp, newPassword, confirmNewPassword } = req.body;
+
+  try {
+    // Validate inputs
+    if (!email || !otp || !newPassword || !confirmNewPassword) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      return res.status(400).json({ message: "New password and confirm password do not match." });
+    }
+
+    // Check password strength
+   
+
+    // Find user and validate OTP
+    const user = await User.findOne({
+      email,
+      resetPasswordToken: otp,
+      resetPasswordExpires: { $gt: Date.now() }, // Ensure OTP is still valid
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired OTP." });
+    }
+
+    // Hash the new password and update
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetPasswordToken = undefined; // Clear OTP
+    user.resetPasswordExpires = undefined; // Clear OTP expiry
+    await user.save();
+
+    res.status(200).json({ message: "Password reset successfully." });
+  } catch (error) {
+    console.error("Error in resetPassword:", error.message); // Avoid logging sensitive data
+    res.status(500).json({ message: "An error occurred. Please try again later." });
+  }
+};
+
+
 
 
 module.exports = {
@@ -332,7 +509,15 @@ module.exports = {
   getAllUsers,
   updateUser,
   deleteUser,
-  verifyAndRefreshToken
+  verifyAndRefreshToken,
+  forgetPassword,
+  resetPassword,
+  changePassword,
+  authenticateToken
 
 };
+
+
+
+
 

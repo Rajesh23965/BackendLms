@@ -12,11 +12,15 @@ const fineRoutes = require('./routes/fineRoutes');
 const batchRoutes =require('./routes/batchRoutes.js');
 const departmentRoutes=require("./routes/departmentRoutes.js")
 const borrowRoutes=require("./routes/borrowRoutes.js")
+const path = require('path');
+
 require('dotenv').config();
 
 const PORT=process.env.PORT || 8000
 const app = express();
 app.use("/uploads", express.static("uploads"));
+app.use('/pdfs', express.static(path.join(__dirname, 'pdfs')));
+
 app.use(express.urlencoded({ extended: true }));
 DBCon()
 // Middleware
@@ -24,12 +28,13 @@ app.use(express.json());
 app.use(cookieparser())
 // CORS options
 const corsOptions = {
-  origin: "http://localhost:5173", // React frontend's URL
-  credentials: true, // Allow credentials like cookies, authorization headers
-  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allowed HTTP methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers
-  optionsSuccessStatus: 200, // For legacy browser support
+  origin: "http://localhost:5173", 
+  credentials: true, 
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200,
 };
+
 
 // Use the CORS middleware
 app.use(cors(corsOptions));

@@ -37,23 +37,40 @@ const createBatch = async (req, res) => {
     res.status(500).json({ message: "Error creating batch", error: error.message || error });
   }
 };
+const getBatch = async (req, res) => {
+  try {
+    const { role, batch: userBatch } = req.user;
 
-  //Get Batch data
-
-
-  const getBatch = async (req, res) => {
-    try {
-      const getAllBatch = await BatchModel.find();
-      if (!getAllBatch) {
-        return res.status(404).json({ message: "Batch not found" });
-      } else {
-        return res.status(200).json({ getAllBatch, message: "Batch found successfully" });  
-      }
-    } catch (error) {
-      console.log(error);
-      return res.status(500).json({ message: "Internal server error" });
+    if (!role) {
+      return res.status(403).json({ message: "Role information missing" });
     }
-  };
+
+    let getAllBatch;
+
+    if (role === "admin") {
+      getAllBatch = await BatchModel.find();
+    } else if (role === "student") {
+      if (!userBatch) {
+        return res.status(400).json({ message: "User batch is not specified" });
+      }
+      getAllBatch = await BatchModel.find({ _id: userBatch });
+    } else {
+      return res.status(403).json({ message: "Access denied. Invalid role" });
+    }
+
+    if (!getAllBatch || getAllBatch.length === 0) {
+      return res.status(404).json({ message: "No batch found" });
+    }
+
+    res.status(200).json({ getAllBatch, message: "Batches retrieved successfully" });
+  } catch (error) {
+    console.error("Error fetching batch:", error);
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message || error,
+    });
+  }
+};
 
   const updateBatch = async (req, res) => {
     try {

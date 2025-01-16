@@ -9,7 +9,8 @@ const {
   deleteBook,
   getAllBooks,
   getBookById,
-  searchBooks
+  searchBooks,
+  countBooks
 } = require("../controllers/bookController.js");
 const {
   isAuthenticated,
@@ -41,11 +42,11 @@ const upload = multer({
       cb(new Error("Invalid file type."));
     }
   },
-  // Limit file size to 2MB
-  limits: { fileSize: 3 * 1024 * 1024 }, 
+
+  limits: { fileSize: 30 * 1024 * 1024 }, 
 });
 
-// Route for admin to create a book
+
 router.post(
   "/create",
   isAuthenticated,
@@ -66,7 +67,8 @@ router.post(
   },
   createBook
 );
-router.get('/search', isAuthenticated, isAdmin, searchBooks);
+router.get('/search',isAuthenticated, isAdmin,   searchBooks);
+router.get('/count',isAuthenticated, isAdmin,  countBooks);
 // Route for admin to update a book
 router.put("/update/:bookId", isAuthenticated, isAdmin, updateBook);
 
@@ -74,10 +76,8 @@ router.put("/update/:bookId", isAuthenticated, isAdmin, updateBook);
 router.delete("/delete/:bookId", isAuthenticated, isAdmin, deleteBook);
 
 // Route for all authenticated users to get all books
-router.get("/all", isAuthenticated, getAllBooks);
-// Allow authenticated users (remove isAdmin if not required for this endpoint)
+router.get("/all",isAuthenticated,isAdmin,  getAllBooks);
 
-// Route for all users to get a book by ID (removed isAdmin)
-router.get("/:bookId", getBookById);
+router.get("/:bookId",isAuthenticated, isAdmin,  getBookById);
 
 module.exports = router;
